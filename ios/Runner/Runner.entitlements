@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Replace VOTRE-DOMAINE.EXAMPLE with the real production domain once
+	     it's chosen — this is the other half of Universal Links, alongside
+	     Android's intent-filter in AndroidManifest.xml and the backend's
+	     /.well-known/apple-app-site-association (which already has the
+	     correct Team ID, NGDX5JH2X5, read from this same Xcode project). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:VOTRE-DOMAINE.EXAMPLE</string>
+	</array>
+</dict>
+</plist>
