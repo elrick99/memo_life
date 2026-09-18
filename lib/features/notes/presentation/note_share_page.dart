@@ -55,9 +55,8 @@ class _NoteSharePageState extends State<NoteSharePage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _createOrRegenerate() async {
@@ -122,10 +121,7 @@ class _NoteSharePageState extends State<NoteSharePage> {
                 ),
                 const SizedBox(height: 24),
                 if (_link?.url != null) ...[
-                  SelectableText(
-                    _link!.url!,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  SelectableText(_link!.url!, style: theme.textTheme.bodySmall),
                   const SizedBox(height: 8),
                   FilledButton.icon(
                     onPressed: () => _copy(_link!.url!),

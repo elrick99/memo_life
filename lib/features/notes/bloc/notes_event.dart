@@ -35,23 +35,29 @@ class NotesArchivedFilterToggled extends NotesEvent {
 class NoteCreateRequested extends NotesEvent {
   const NoteCreateRequested({
     this.categoryLocalUuid,
+    this.tagLocalUuids = const [],
     required this.title,
     this.content,
+    this.contentFormat = 'plain',
     this.checklist = const [],
     this.priority = 'normal',
   });
 
   final String? categoryLocalUuid;
+  final List<String> tagLocalUuids;
   final String title;
   final String? content;
+  final String contentFormat;
   final List<ChecklistItem> checklist;
   final String priority;
 
   @override
   List<Object?> get props => [
     categoryLocalUuid,
+    tagLocalUuids,
     title,
     content,
+    contentFormat,
     checklist,
     priority,
   ];
@@ -77,6 +83,24 @@ class NoteDeleted extends NotesEvent {
 
 class NoteArchiveToggled extends NotesEvent {
   const NoteArchiveToggled(this.note);
+
+  final NoteModel note;
+
+  @override
+  List<Object?> get props => [note];
+}
+
+class NotePinToggled extends NotesEvent {
+  const NotePinToggled(this.note);
+
+  final NoteModel note;
+
+  @override
+  List<Object?> get props => [note];
+}
+
+class NoteLockToggled extends NotesEvent {
+  const NoteLockToggled(this.note);
 
   final NoteModel note;
 

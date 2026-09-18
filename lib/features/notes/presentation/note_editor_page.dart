@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:laravel_reverb/laravel_reverb.dart';
 
 import '../../../core/di/service_locator.dart';
@@ -11,11 +12,14 @@ import '../../attachments/presentation/attachment_list.dart';
 import '../../budget/presentation/widgets/category_picker.dart';
 import '../bloc/notes_bloc.dart';
 import '../data/checklist_item.dart';
+import '../data/note_content_codec.dart';
+import '../data/note_lock_service.dart';
 import '../data/note_model.dart';
 import '../data/note_realtime_remote_data_source.dart';
 import '../data/note_remote_data_source.dart';
 import 'note_collaborators_page.dart';
 import 'note_share_page.dart';
+import 'widgets/tag_picker.dart';
 
 const _priorities = {
   'low': 'Faible',
@@ -40,17 +44,31 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
   late final _titleController = TextEditingController(
     text: widget.note?.title ?? '',
   );
-  late final _contentController = TextEditingController(
-    text: widget.note?.content ?? '',
+  late final _quillController = QuillController(
+    document: NoteContentCodec.decode(
+      widget.note?.content,
+      widget.note?.contentFormat ?? 'plain',
+    ),
+    selection: const TextSelection.collapsed(offset: 0),
   );
+  final _editorFocusNode = FocusNode();
+  final _editorScrollController = ScrollController();
   late final _newChecklistItemController = TextEditingController();
   late String _priority = widget.note?.priority ?? 'normal';
   late List<ChecklistItem> _checklist = List.of(
     widget.note?.checklist ?? const [],
   );
   late String? _categoryLocalUuid = widget.note?.categoryLocalUuid;
+  late List<String> _tagLocalUuids = List.of(
+    widget.note?.tagLocalUuids ?? const [],
+  );
+  late bool _isPinned = widget.note?.isPinned ?? false;
+  late bool _isLocked = widget.note?.isLocked ?? false;
+  late bool _isUnlocked = !(widget.note?.isLocked ?? false);
+  bool _authenticationFailed = false;
 
   Subscription? _realtimeSubscription;
+  StreamSubscription<DocChange>? _documentChangesSubscription;
   Timer? _realtimePushDebounce;
   DateTime? _lastKnownUpdatedAt;
 
@@ -66,9 +84,46 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
   @override
   void initState() {
     super.initState();
+    if (!_isUnlocked) {
+      _authenticate();
+
+      return;
+    }
     if (_supportsRealtime) {
       _lastKnownUpdatedAt = widget.note!.updatedAt;
-      _contentController.addListener(_scheduleRealtimePush);
+      _listenForLocalChanges();
+      _subscribeToRealtimeUpdates();
+    }
+  }
+
+  /// (Re)subscribes to the current document's change stream — must be
+  /// called again after swapping `_quillController.document` wholesale
+  /// (incoming realtime updates), since that stream belongs to the
+  /// document instance, not the controller.
+  void _listenForLocalChanges() {
+    _documentChangesSubscription?.cancel();
+    _documentChangesSubscription = _quillController.document.changes.listen(
+      (_) => _scheduleRealtimePush(),
+    );
+  }
+
+  Future<void> _authenticate() async {
+    final authenticated = await getIt<NoteLockService>().authenticate();
+    if (!mounted) {
+      return;
+    }
+    if (!authenticated) {
+      setState(() => _authenticationFailed = true);
+
+      return;
+    }
+    setState(() {
+      _isUnlocked = true;
+      _authenticationFailed = false;
+    });
+    if (_supportsRealtime) {
+      _lastKnownUpdatedAt = widget.note!.updatedAt;
+      _listenForLocalChanges();
       _subscribeToRealtimeUpdates();
     }
   }
@@ -77,9 +132,11 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
   void dispose() {
     _realtimePushDebounce?.cancel();
     _realtimeSubscription?.cancel();
-    _contentController.removeListener(_scheduleRealtimePush);
+    _documentChangesSubscription?.cancel();
     _titleController.dispose();
-    _contentController.dispose();
+    _quillController.dispose();
+    _editorFocusNode.dispose();
+    _editorScrollController.dispose();
     _newChecklistItemController.dispose();
     super.dispose();
   }
@@ -104,11 +161,15 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       return;
     }
     setState(() {
-      _contentController.text = data['content'] as String? ?? '';
+      _quillController.document = NoteContentCodec.decode(
+        data['content'] as String?,
+        'delta',
+      );
       _checklist = (data['checklist'] as List<dynamic>? ?? const [])
           .map((item) => ChecklistItem.fromJson(item as Map<String, dynamic>))
           .toList();
     });
+    _listenForLocalChanges();
     _lastKnownUpdatedAt = DateTime.parse(data['updated_at'] as String);
   }
 
@@ -129,7 +190,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
     try {
       final result = await getIt<NoteRealtimeRemoteDataSource>().push(
         noteServerUuid: serverUuid,
-        content: _contentController.text,
+        content: NoteContentCodec.encode(_quillController.document),
         checklist: _checklist,
         lastKnownUpdatedAt: lastKnownUpdatedAt,
       );
@@ -152,14 +213,16 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       }
       final update = NoteRealtimeUpdate.fromJson(json);
       setState(() {
-        _contentController.text = update.content ?? '';
+        _quillController.document = NoteContentCodec.decode(
+          update.content,
+          'delta',
+        );
         _checklist = update.checklist;
       });
+      _listenForLocalChanges();
       _lastKnownUpdatedAt = update.updatedAt;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Un collaborateur a modifié cette note.'),
-        ),
+        const SnackBar(content: Text('Un collaborateur a modifié cette note.')),
       );
     } on ApiException {
       // Give up silently — the next debounced push retries with whatever
@@ -169,23 +232,28 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
 
   void _save() {
     if (_titleController.text.trim().isEmpty &&
-        _contentController.text.trim().isEmpty) {
+        _quillController.document.isEmpty()) {
       Navigator.of(context).pop();
 
       return;
     }
 
+    final content = NoteContentCodec.encode(_quillController.document);
     final bloc = context.read<NotesBloc>();
     if (_isEditing) {
       bloc.add(
         NoteUpdateRequested(
           widget.note!.copyWith(
             title: _titleController.text.trim(),
-            content: _contentController.text.trim(),
+            content: content,
+            contentFormat: 'delta',
             checklist: _checklist,
             priority: _priority,
             categoryLocalUuid: _categoryLocalUuid,
             clearCategory: _categoryLocalUuid == null,
+            tagLocalUuids: _tagLocalUuids,
+            isPinned: _isPinned,
+            isLocked: _isLocked,
           ),
         ),
       );
@@ -193,8 +261,10 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       bloc.add(
         NoteCreateRequested(
           categoryLocalUuid: _categoryLocalUuid,
+          tagLocalUuids: _tagLocalUuids,
           title: _titleController.text.trim(),
-          content: _contentController.text.trim(),
+          content: content,
+          contentFormat: 'delta',
           checklist: _checklist,
           priority: _priority,
         ),
@@ -261,10 +331,58 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isEditing && !_isUnlocked) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Note verrouillée')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _authenticationFailed
+                      ? 'Authentification échouée.'
+                      : 'Cette note est protégée.',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _authenticate,
+                  child: const Text('Déverrouiller'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Modifier la note' : 'Nouvelle note'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
+            ),
+            tooltip: _isLocked ? 'Déverrouiller' : 'Verrouiller',
+            onPressed: () => setState(() => _isLocked = !_isLocked),
+          ),
+          IconButton(
+            icon: Icon(
+              _isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+            ),
+            tooltip: _isPinned ? 'Désépingler' : 'Épingler',
+            onPressed: () => setState(() => _isPinned = !_isPinned),
+          ),
           if (_isEditing) ...[
             IconButton(
               icon: const Icon(Icons.person_add_alt_rounded),
@@ -292,13 +410,24 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
-            controller: _contentController,
-            minLines: 3,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              hintText: 'Écrivez quelque chose…',
-              border: InputBorder.none,
+          QuillSimpleToolbar(controller: _quillController),
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(minHeight: 120),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: QuillEditor.basic(
+              controller: _quillController,
+              focusNode: _editorFocusNode,
+              scrollController: _editorScrollController,
+              config: const QuillEditorConfig(
+                placeholder: 'Écrivez quelque chose…',
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                scrollable: false,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -319,6 +448,11 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
             type: 'note',
             selectedLocalUuid: _categoryLocalUuid,
             onChanged: (value) => setState(() => _categoryLocalUuid = value),
+          ),
+          const SizedBox(height: 16),
+          TagPicker(
+            selectedLocalUuids: _tagLocalUuids,
+            onChanged: (value) => setState(() => _tagLocalUuids = value),
           ),
           const Divider(height: 32),
           Text(

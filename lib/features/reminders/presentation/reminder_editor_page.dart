@@ -44,6 +44,7 @@ class _ReminderEditorPageState extends State<ReminderEditorPage> {
   late String _recurrence = widget.reminder?.recurrence ?? 'none';
   late String? _noteLocalUuid = widget.reminder?.noteLocalUuid;
   late String? _categoryLocalUuid = widget.reminder?.categoryLocalUuid;
+  late bool _isPinned = widget.reminder?.isPinned ?? false;
 
   bool get _isEditing => widget.reminder != null;
 
@@ -123,6 +124,7 @@ class _ReminderEditorPageState extends State<ReminderEditorPage> {
             clearNote: _noteLocalUuid == null,
             categoryLocalUuid: _categoryLocalUuid,
             clearCategory: _categoryLocalUuid == null,
+            isPinned: _isPinned,
           ),
         ),
       );
@@ -151,6 +153,13 @@ class _ReminderEditorPageState extends State<ReminderEditorPage> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Modifier le rappel' : 'Nouveau rappel'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+            ),
+            tooltip: _isPinned ? 'Désépingler' : 'Épingler',
+            onPressed: () => setState(() => _isPinned = !_isPinned),
+          ),
           if (_isEditing)
             IconButton(
               icon: const Icon(Icons.person_add_alt_rounded),

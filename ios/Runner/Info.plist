@@ -47,6 +47,8 @@
 	     on the iOS Simulator (http://127.0.0.1:8000). -->
 	<key>NSContactsUsageDescription</key>
 	<string>Memo Life a besoin d'accéder à vos contacts pour vous permettre d'inviter facilement quelqu'un sur une note ou un rappel.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Memo Life utilise Face ID pour déverrouiller vos notes protégées.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

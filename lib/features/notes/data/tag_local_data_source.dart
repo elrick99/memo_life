@@ -3,24 +3,24 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/app_database.dart';
 import '../../../core/storage/sync_query_helpers.dart';
-import 'reminder_model.dart';
+import 'tag_model.dart';
 
-const _table = 'reminders';
+const _table = 'tags';
 
-class ReminderLocalDataSource {
-  ReminderLocalDataSource(this._appDatabase);
+class TagLocalDataSource {
+  TagLocalDataSource(this._appDatabase);
 
   final AppDatabase _appDatabase;
   final _uuid = const Uuid();
 
-  Future<List<ReminderModel>> getAll() async {
+  Future<List<TagModel>> getAll() async {
     final db = await _appDatabase.database;
-    final rows = await db.query(_table, orderBy: 'is_pinned DESC, due_at ASC');
+    final rows = await db.query(_table, orderBy: 'name ASC');
 
-    return rows.map(ReminderModel.fromRow).toList();
+    return rows.map(TagModel.fromRow).toList();
   }
 
-  Future<ReminderModel?> getByLocalUuid(String localUuid) async {
+  Future<TagModel?> getByLocalUuid(String localUuid) async {
     final db = await _appDatabase.database;
     final rows = await db.query(
       _table,
@@ -28,16 +28,16 @@ class ReminderLocalDataSource {
       whereArgs: [localUuid],
     );
 
-    return rows.isEmpty ? null : ReminderModel.fromRow(rows.first);
+    return rows.isEmpty ? null : TagModel.fromRow(rows.first);
   }
 
   String newLocalUuid() => _uuid.v4();
 
-  Future<void> upsert(ReminderModel reminder) async {
+  Future<void> upsert(TagModel tag) async {
     final db = await _appDatabase.database;
     await db.insert(
       _table,
-      reminder.toRow(),
+      tag.toRow(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -92,38 +92,21 @@ class ReminderLocalDataSource {
     return rows.map((row) => row['server_uuid']! as String).toSet();
   }
 
-  /// Resolves a note's *local* uuid to its *server* uuid, for the FK the
-  /// reminder push payload needs. Returns null if the note hasn't synced
-  /// yet — the repository then defers this reminder to the next sync pass.
-  Future<String?> noteServerUuidFor(String? noteLocalUuid) async =>
+  /// Resolves a tag's *local* uuid to its *server* uuid, for the note push
+  /// payload. Returns null if the tag hasn't synced yet.
+  Future<String?> serverUuidFor(String localUuid) async =>
       SyncQueryHelpers.serverUuidFor(
         await _appDatabase.database,
-        'notes',
-        noteLocalUuid,
+        _table,
+        localUuid,
       );
 
-  /// Resolves a note's *server* uuid (as returned nested in a pulled
-  /// reminder) back to its local uuid.
-  Future<String?> noteLocalUuidFor(String? noteServerUuid) async =>
+  /// Resolves a tag's *server* uuid (as returned nested in a pulled note)
+  /// back to its local uuid.
+  Future<String?> localUuidForServer(String serverUuid) async =>
       SyncQueryHelpers.localUuidFor(
         await _appDatabase.database,
-        'notes',
-        noteServerUuid,
-      );
-
-  /// Same as [noteServerUuidFor]/[noteLocalUuidFor], for the reminder's
-  /// optional category FK.
-  Future<String?> categoryServerUuidFor(String? categoryLocalUuid) async =>
-      SyncQueryHelpers.serverUuidFor(
-        await _appDatabase.database,
-        'categories',
-        categoryLocalUuid,
-      );
-
-  Future<String?> categoryLocalUuidFor(String? categoryServerUuid) async =>
-      SyncQueryHelpers.localUuidFor(
-        await _appDatabase.database,
-        'categories',
-        categoryServerUuid,
+        _table,
+        serverUuid,
       );
 }

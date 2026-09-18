@@ -12,39 +12,32 @@ import 'package:laravel_reverb/testing.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test(
-    'a note.content-updated event on the presence-notes.{uuid} channel is delivered as the editor expects',
-    () async {
-      final fake = ReverbFake();
-      await fake.connect();
+  test('a note.content-updated event on the presence-notes.{uuid} channel is delivered as the editor expects', () async {
+    final fake = ReverbFake();
+    await fake.connect();
 
-      Map<String, dynamic>? received;
-      fake.reverb
-          .presence('notes.abc-123')
-          .listen('.note.content-updated', (data) => received = data);
-      await Future<void>.delayed(Duration.zero);
+    Map<String, dynamic>? received;
+    fake.reverb
+        .presence('notes.abc-123')
+        .listen('.note.content-updated', (data) => received = data);
+    await Future<void>.delayed(Duration.zero);
 
-      fake.emit(
-        'presence-notes.abc-123',
-        'note.content-updated',
-        {
-          'note_uuid': 'abc-123',
-          'title': 'Titre',
-          'content': 'Nouveau contenu',
-          'checklist': [
-            {'text': 'Lait', 'completed': false},
-          ],
-          'updated_by': {'id': 2, 'name': 'Collègue'},
-          'updated_at': '2026-09-17T12:00:00.000000Z',
-        },
-      );
-      await Future<void>.delayed(Duration.zero);
+    fake.emit('presence-notes.abc-123', 'note.content-updated', {
+      'note_uuid': 'abc-123',
+      'title': 'Titre',
+      'content': 'Nouveau contenu',
+      'checklist': [
+        {'text': 'Lait', 'completed': false},
+      ],
+      'updated_by': {'id': 2, 'name': 'Collègue'},
+      'updated_at': '2026-09-17T12:00:00.000000Z',
+    });
+    await Future<void>.delayed(Duration.zero);
 
-      expect(received, isNotNull);
-      expect(received!['content'], 'Nouveau contenu');
-      expect(received!['checklist'], hasLength(1));
-      expect(received!['updated_at'], '2026-09-17T12:00:00.000000Z');
-      fake.dispose();
-    },
-  );
+    expect(received, isNotNull);
+    expect(received!['content'], 'Nouveau contenu');
+    expect(received!['checklist'], hasLength(1));
+    expect(received!['updated_at'], '2026-09-17T12:00:00.000000Z');
+    fake.dispose();
+  });
 }

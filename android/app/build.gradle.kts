@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.codershap.memo_life"
-    compileSdk = flutter.compileSdkVersion
+    // Pinned above flutter.compileSdkVersion: flutter_plugin_android_lifecycle
+    // (pulled in transitively by file_picker) requires compileSdk 36+.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

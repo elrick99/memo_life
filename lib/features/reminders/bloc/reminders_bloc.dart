@@ -19,6 +19,7 @@ class RemindersBloc extends Bloc<RemindersEvent, RemindersState> {
     on<ReminderUpdateRequested>(_onUpdateRequested);
     on<ReminderCompletedToggled>(_onCompletedToggled);
     on<ReminderDeleted>(_onDeleted);
+    on<ReminderPinToggled>(_onPinToggled);
   }
 
   final ReminderRepository _repository;
@@ -99,6 +100,13 @@ class RemindersBloc extends Bloc<RemindersEvent, RemindersState> {
     Emitter<RemindersState> emit,
   ) async {
     await _repository.deleteReminder(event.reminder);
+  }
+
+  Future<void> _onPinToggled(
+    ReminderPinToggled event,
+    Emitter<RemindersState> emit,
+  ) async {
+    await _repository.togglePin(event.reminder);
   }
 
   @override

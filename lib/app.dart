@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 import 'package:go_router/go_router.dart';
 
 import 'core/di/service_locator.dart';
@@ -56,6 +59,15 @@ class MemoLifeApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
+            // Required by the note editor's rich-text toolbar
+            // (QuillSimpleToolbar) for its tooltip/action strings.
+            localizationsDelegates: const [
+              FlutterQuillLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [Locale('fr'), Locale('en')],
             routerConfig: router,
           );
         },

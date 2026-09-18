@@ -5,22 +5,22 @@ class NotePublicView {
   const NotePublicView({
     required this.title,
     required this.content,
+    required this.contentFormat,
     required this.checklist,
   });
 
-  factory NotePublicView.fromJson(Map<String, dynamic> json) =>
-      NotePublicView(
-        title: json['title'] as String?,
-        content: json['content'] as String?,
-        checklist: (json['checklist'] as List<dynamic>? ?? const [])
-            .map(
-              (item) => ChecklistItem.fromJson(item as Map<String, dynamic>),
-            )
-            .toList(),
-      );
+  factory NotePublicView.fromJson(Map<String, dynamic> json) => NotePublicView(
+    title: json['title'] as String?,
+    content: json['content'] as String?,
+    contentFormat: json['content_format'] as String? ?? 'plain',
+    checklist: (json['checklist'] as List<dynamic>? ?? const [])
+        .map((item) => ChecklistItem.fromJson(item as Map<String, dynamic>))
+        .toList(),
+  );
 
   final String? title;
   final String? content;
+  final String contentFormat;
   final List<ChecklistItem> checklist;
 }
 

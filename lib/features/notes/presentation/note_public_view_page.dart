@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../data/note_content_codec.dart';
 import '../data/note_public_remote_data_source.dart';
 
 /// Read-only viewer reached via the note share deep link
@@ -54,36 +56,53 @@ class _NotePublicViewPageState extends State<NotePublicViewPage> {
         null when error != null => Center(child: Text(error)),
         null => const Center(child: CircularProgressIndicator()),
         _ => ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                (note.title?.isEmpty ?? true) ? 'Sans titre' : note.title!,
-                style: theme.textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 16),
-              if (note.content != null && note.content!.isNotEmpty)
-                Text(note.content!),
-              if (note.checklist.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ...note.checklist.map(
-                  (item) => CheckboxListTile(
-                    value: item.completed,
-                    onChanged: null,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    title: Text(item.text),
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              (note.title?.isEmpty ?? true) ? 'Sans titre' : note.title!,
+              style: theme.textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 16),
+            if (note.content != null && note.content!.isNotEmpty)
+              IgnorePointer(
+                child: QuillEditor.basic(
+                  controller: QuillController(
+                    document: NoteContentCodec.decode(
+                      note.content,
+                      note.contentFormat,
+                    ),
+                    selection: const TextSelection.collapsed(offset: 0),
+                    readOnly: true,
+                  ),
+                  config: const QuillEditorConfig(
+                    scrollable: false,
+                    padding: EdgeInsets.zero,
+                    showCursor: false,
+                    enableInteractiveSelection: false,
                   ),
                 ),
-              ],
-              const SizedBox(height: 24),
-              Text(
-                'Lecture seule — partagé via un lien.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              ),
+            if (note.checklist.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ...note.checklist.map(
+                (item) => CheckboxListTile(
+                  value: item.completed,
+                  onChanged: null,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(item.text),
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 24),
+            Text(
+              'Lecture seule — partagé via un lien.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       },
     );
   }

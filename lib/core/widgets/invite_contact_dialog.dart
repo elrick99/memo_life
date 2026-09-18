@@ -106,7 +106,9 @@ class _InviteContactDialogState extends State<_InviteContactDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(error.message ?? 'Impossible d\'ouvrir les contacts.'),
+            content: Text(
+              error.message ?? 'Impossible d\'ouvrir les contacts.',
+            ),
           ),
         );
       }

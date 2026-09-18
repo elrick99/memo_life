@@ -8,6 +8,7 @@ import '../../../core/widgets/sync_status_chip.dart';
 import '../bloc/reminders_bloc.dart';
 import '../data/reminder_model.dart';
 import 'reminder_editor_page.dart';
+import 'reminders_timeline_page.dart';
 import 'widgets/reminder_tile.dart';
 
 class RemindersListPage extends StatefulWidget {
@@ -31,6 +32,18 @@ class _RemindersListPageState extends State<RemindersListPage> {
         title: 'Rappels',
         icon: Icons.alarm_rounded,
         actions: [
+          IconButton(
+            tooltip: 'Vue agenda',
+            icon: const Icon(Icons.view_timeline_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => BlocProvider.value(
+                  value: context.read<RemindersBloc>(),
+                  child: const RemindersTimelinePage(),
+                ),
+              ),
+            ),
+          ),
           BlocBuilder<RemindersBloc, RemindersState>(
             buildWhen: (previous, current) =>
                 previous.showCompleted != current.showCompleted,
@@ -154,6 +167,7 @@ class _ReminderListItem extends StatelessWidget {
           ),
         ),
         onToggleCompleted: () => bloc.add(ReminderCompletedToggled(reminder)),
+        onPinToggle: () => bloc.add(ReminderPinToggled(reminder)),
       ),
     );
   }

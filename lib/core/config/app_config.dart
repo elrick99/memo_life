@@ -50,6 +50,5 @@ class AppConfig {
     defaultValue: 'f5734a0c7bc51f453bf5d562413ecc65',
   );
 
-  static bool get reverbUseTLS =>
-      const bool.fromEnvironment('REVERB_USE_TLS');
+  static bool get reverbUseTLS => const bool.fromEnvironment('REVERB_USE_TLS');
 }

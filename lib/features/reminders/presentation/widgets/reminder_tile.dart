@@ -17,11 +17,13 @@ class ReminderTile extends StatelessWidget {
     required this.reminder,
     required this.onTap,
     required this.onToggleCompleted,
+    required this.onPinToggle,
   });
 
   final ReminderModel reminder;
   final VoidCallback onTap;
   final VoidCallback onToggleCompleted;
+  final VoidCallback onPinToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -79,13 +81,31 @@ class ReminderTile extends StatelessWidget {
             ],
           ],
         ),
-        trailing: reminder.isSynced
-            ? null
-            : Icon(
-                Icons.cloud_upload_outlined,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!reminder.isSynced)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(
+                  Icons.cloud_upload_outlined,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                reminder.isPinned
+                    ? Icons.push_pin_rounded
+                    : Icons.push_pin_outlined,
+                size: 20,
+                color: reminder.isPinned ? theme.colorScheme.primary : null,
+              ),
+              onPressed: onPinToggle,
+            ),
+          ],
+        ),
       ),
     );
   }

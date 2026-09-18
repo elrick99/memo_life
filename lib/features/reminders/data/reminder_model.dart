@@ -36,6 +36,7 @@ class ReminderModel {
     this.priority = 'normal',
     this.recurrence = 'none',
     this.isCompleted = false,
+    this.isPinned = false,
     required this.updatedAt,
     this.syncStatus = SyncStatus.pendingCreate,
   });
@@ -52,6 +53,7 @@ class ReminderModel {
   final String priority;
   final String recurrence;
   final bool isCompleted;
+  final bool isPinned;
   final DateTime updatedAt;
   final String syncStatus;
 
@@ -71,6 +73,7 @@ class ReminderModel {
     String? priority,
     String? recurrence,
     bool? isCompleted,
+    bool? isPinned,
     DateTime? updatedAt,
     String? syncStatus,
     String? serverUuid,
@@ -89,6 +92,7 @@ class ReminderModel {
     priority: priority ?? this.priority,
     recurrence: recurrence ?? this.recurrence,
     isCompleted: isCompleted ?? this.isCompleted,
+    isPinned: isPinned ?? this.isPinned,
     updatedAt: updatedAt ?? this.updatedAt,
     syncStatus: syncStatus ?? this.syncStatus,
   );
@@ -106,6 +110,7 @@ class ReminderModel {
     priority: row['priority']! as String,
     recurrence: row['recurrence']! as String,
     isCompleted: (row['is_completed']! as int) == 1,
+    isPinned: (row['is_pinned']! as int) == 1,
     updatedAt: DateTime.parse(row['updated_at']! as String),
     syncStatus: row['sync_status']! as String,
   );
@@ -123,6 +128,7 @@ class ReminderModel {
     'priority': priority,
     'recurrence': recurrence,
     'is_completed': isCompleted ? 1 : 0,
+    'is_pinned': isPinned ? 1 : 0,
     'updated_at': updatedAt.toIso8601String(),
     'sync_status': syncStatus,
   };
@@ -147,6 +153,7 @@ class ReminderModel {
     priority: json['priority'] as String? ?? 'normal',
     recurrence: json['recurrence'] as String? ?? 'none',
     isCompleted: json['is_completed'] as bool? ?? false,
+    isPinned: json['is_pinned'] as bool? ?? false,
     updatedAt: DateTime.now(),
     syncStatus: SyncStatus.synced,
   );
@@ -165,5 +172,6 @@ class ReminderModel {
         'priority': priority,
         'recurrence': recurrence,
         'is_completed': isCompleted,
+        'is_pinned': isPinned,
       };
 }

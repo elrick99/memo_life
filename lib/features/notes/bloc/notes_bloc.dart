@@ -20,6 +20,8 @@ class NotesBloc extends Bloc<NotesEvent, NotesState> {
     on<NoteUpdateRequested>(_onNoteUpdateRequested);
     on<NoteDeleted>(_onNoteDeleted);
     on<NoteArchiveToggled>(_onNoteArchiveToggled);
+    on<NotePinToggled>(_onNotePinToggled);
+    on<NoteLockToggled>(_onNoteLockToggled);
   }
 
   final NoteRepository _repository;
@@ -66,8 +68,10 @@ class NotesBloc extends Bloc<NotesEvent, NotesState> {
   ) async {
     await _repository.createNote(
       categoryLocalUuid: event.categoryLocalUuid,
+      tagLocalUuids: event.tagLocalUuids,
       title: event.title,
       content: event.content,
+      contentFormat: event.contentFormat,
       checklist: event.checklist,
       priority: event.priority,
     );
@@ -92,6 +96,20 @@ class NotesBloc extends Bloc<NotesEvent, NotesState> {
     Emitter<NotesState> emit,
   ) async {
     await _repository.toggleArchive(event.note);
+  }
+
+  Future<void> _onNotePinToggled(
+    NotePinToggled event,
+    Emitter<NotesState> emit,
+  ) async {
+    await _repository.togglePin(event.note);
+  }
+
+  Future<void> _onNoteLockToggled(
+    NoteLockToggled event,
+    Emitter<NotesState> emit,
+  ) async {
+    await _repository.toggleLock(event.note);
   }
 
   @override

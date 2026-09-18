@@ -18,7 +18,7 @@ class NoteLocalDataSource {
     final rows = await db.query(
       _table,
       where: includeArchived ? null : 'is_archived = 0',
-      orderBy: 'updated_at DESC',
+      orderBy: 'is_pinned DESC, updated_at DESC',
     );
 
     return rows.map(NoteModel.fromRow).toList();

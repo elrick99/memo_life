@@ -12,9 +12,7 @@ class NoteRealtimeUpdate {
       NoteRealtimeUpdate(
         content: json['content'] as String?,
         checklist: (json['checklist'] as List<dynamic>? ?? const [])
-            .map(
-              (item) => ChecklistItem.fromJson(item as Map<String, dynamic>),
-            )
+            .map((item) => ChecklistItem.fromJson(item as Map<String, dynamic>))
             .toList(),
         updatedAt: DateTime.parse(json['updated_at'] as String),
       );

@@ -153,6 +153,7 @@ class _NoteListItem extends StatelessWidget {
           ),
         ),
         onArchiveToggle: () => bloc.add(NoteArchiveToggled(note)),
+        onPinToggle: () => bloc.add(NotePinToggled(note)),
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'checklist_item.dart';
 import 'note_local_data_source.dart';
 import 'note_model.dart';
 import 'note_remote_data_source.dart';
+import 'tag_local_data_source.dart';
 
 /// Owns the `notes` table's offline-first lifecycle: every mutation writes
 /// local-first (so the UI never waits on the network), then asks
@@ -19,12 +20,14 @@ class NoteRepository implements Syncable {
     required this._local,
     required this._remote,
     required this._syncManager,
+    required this._tags,
     this._attachmentRepository,
   });
 
   final NoteLocalDataSource _local;
   final NoteRemoteDataSource _remote;
   final SyncManager _syncManager;
+  final TagLocalDataSource _tags;
   final AttachmentRepository? _attachmentRepository;
   final _changesController = StreamController<void>.broadcast();
 
@@ -37,8 +40,10 @@ class NoteRepository implements Syncable {
 
   Future<NoteModel> createNote({
     String? categoryLocalUuid,
+    List<String> tagLocalUuids = const [],
     required String title,
     String? content,
+    String contentFormat = 'plain',
     List<ChecklistItem> checklist = const [],
     String priority = 'normal',
     String? color,
@@ -47,8 +52,10 @@ class NoteRepository implements Syncable {
     final note = NoteModel(
       localUuid: _local.newLocalUuid(),
       categoryLocalUuid: categoryLocalUuid,
+      tagLocalUuids: tagLocalUuids,
       title: title,
       content: content,
+      contentFormat: contentFormat,
       checklist: checklist,
       priority: priority,
       color: color,
@@ -74,6 +81,12 @@ class NoteRepository implements Syncable {
 
   Future<void> toggleArchive(NoteModel note) =>
       updateNote(note.copyWith(isArchived: !note.isArchived));
+
+  Future<void> togglePin(NoteModel note) =>
+      updateNote(note.copyWith(isPinned: !note.isPinned));
+
+  Future<void> toggleLock(NoteModel note) =>
+      updateNote(note.copyWith(isLocked: !note.isLocked));
 
   Future<void> deleteNote(NoteModel note) async {
     if (note.serverUuid == null) {
@@ -119,8 +132,12 @@ class NoteRepository implements Syncable {
       // instead of creating the note without its category link.
       return;
     }
+    final tagUuids = await _tagServerUuidsFor(note.tagLocalUuids);
+    if (tagUuids == null) {
+      return;
+    }
     final json = await _remote.create(
-      note.toApiPayload(categoryUuid: categoryUuid),
+      note.toApiPayload(categoryUuid: categoryUuid, tagUuids: tagUuids),
     );
     await _local.markSynced(
       localUuid: note.localUuid,
@@ -135,14 +152,33 @@ class NoteRepository implements Syncable {
     if (note.categoryLocalUuid != null && categoryUuid == null) {
       return;
     }
+    final tagUuids = await _tagServerUuidsFor(note.tagLocalUuids);
+    if (tagUuids == null) {
+      return;
+    }
     await _remote.update(
       note.serverUuid!,
-      note.toApiPayload(categoryUuid: categoryUuid),
+      note.toApiPayload(categoryUuid: categoryUuid, tagUuids: tagUuids),
     );
     await _local.markSynced(
       localUuid: note.localUuid,
       serverUuid: note.serverUuid!,
     );
+  }
+
+  /// Resolves every tag's *local* uuid to its *server* uuid. Returns null
+  /// (defer this note to the next sync pass) if any tag hasn't synced yet.
+  Future<List<String>?> _tagServerUuidsFor(List<String> tagLocalUuids) async {
+    final uuids = <String>[];
+    for (final localUuid in tagLocalUuids) {
+      final serverUuid = await _tags.serverUuidFor(localUuid);
+      if (serverUuid == null) {
+        return null;
+      }
+      uuids.add(serverUuid);
+    }
+
+    return uuids;
   }
 
   Future<void> _pushDelete(NoteModel note) async {
@@ -195,11 +231,22 @@ class NoteRepository implements Syncable {
     final categoryLocalUuid = categoryJson == null
         ? null
         : await _local.categoryLocalUuidFor(categoryJson['uuid'] as String?);
+    final tagsJson = json['tags'] as List<dynamic>? ?? const [];
+    final tagLocalUuids = <String>[];
+    for (final tagJson in tagsJson) {
+      final tagLocalUuid = await _tags.localUuidForServer(
+        (tagJson as Map<String, dynamic>)['uuid'] as String,
+      );
+      if (tagLocalUuid != null) {
+        tagLocalUuids.add(tagLocalUuid);
+      }
+    }
 
     final incoming = NoteModel.fromApiJson(
       json,
       localUuid: existingLocalUuid ?? _local.newLocalUuid(),
       categoryLocalUuid: categoryLocalUuid,
+      tagLocalUuids: tagLocalUuids,
     );
     if (existing != null && !incoming.updatedAt.isAfter(existing.updatedAt)) {
       return;

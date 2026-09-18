@@ -6,6 +6,7 @@ import 'package:memo_life/features/notes/data/note_local_data_source.dart';
 import 'package:memo_life/features/notes/data/note_model.dart';
 import 'package:memo_life/features/notes/data/note_remote_data_source.dart';
 import 'package:memo_life/features/notes/data/note_repository.dart';
+import 'package:memo_life/features/notes/data/tag_local_data_source.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -22,6 +23,7 @@ void main() {
   late Database db;
   late NoteRepository repository;
   late NoteLocalDataSource local;
+  late TagLocalDataSource tags;
   late _MockNoteRemoteDataSource remote;
 
   Future<void> insertLocalCategory({
@@ -41,6 +43,21 @@ void main() {
     });
   }
 
+  Future<void> insertLocalTag({
+    required String localUuid,
+    String? serverUuid,
+  }) async {
+    await db.insert('tags', {
+      'local_uuid': localUuid,
+      'server_uuid': serverUuid,
+      'name': 'Une étiquette',
+      'updated_at': DateTime.now().toIso8601String(),
+      'sync_status': serverUuid == null
+          ? SyncStatus.pendingCreate
+          : SyncStatus.synced,
+    });
+  }
+
   setUp(() async {
     db = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
@@ -48,6 +65,7 @@ void main() {
     );
     await AppDatabase.createSchema(db);
     local = NoteLocalDataSource(AppDatabase.forDatabase(db));
+    tags = TagLocalDataSource(AppDatabase.forDatabase(db));
     remote = _MockNoteRemoteDataSource();
 
     final connectivity = _MockConnectivityService();
@@ -60,6 +78,7 @@ void main() {
       local: local,
       remote: remote,
       syncManager: syncManager,
+      tags: tags,
     );
   });
 
@@ -156,6 +175,60 @@ void main() {
       expect(stored!.serverUuid, 'server-1');
       expect(stored.syncStatus, SyncStatus.synced);
     });
+  });
+
+  group('tag FK resolution on push', () {
+    test('a note linked to an unsynced tag is deferred, not pushed', () async {
+      await insertLocalTag(localUuid: 'tag-local-1'); // no server_uuid yet
+      await repository.createNote(
+        tagLocalUuids: ['tag-local-1'],
+        title: 'Idée',
+      );
+
+      await repository.pushPending();
+
+      verifyNever(() => remote.create(any()));
+      final pending = await local.pendingRows();
+      expect(pending, hasLength(1));
+    });
+
+    test(
+      'once every tag has synced, the note push resolves tag_uuids correctly',
+      () async {
+        await insertLocalTag(
+          localUuid: 'tag-local-1',
+          serverUuid: 'tag-server-1',
+        );
+        await insertLocalTag(
+          localUuid: 'tag-local-2',
+          serverUuid: 'tag-server-2',
+        );
+        final note = await repository.createNote(
+          tagLocalUuids: ['tag-local-1', 'tag-local-2'],
+          title: 'Idée',
+        );
+        when(() => remote.create(any())).thenAnswer(
+          (_) async => {
+            'uuid': 'server-1',
+            'title': 'Idée',
+            'priority': 'normal',
+            'color_mode': 'automatic',
+            'is_archived': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+        );
+
+        await repository.pushPending();
+
+        final captured =
+            verify(() => remote.create(captureAny())).captured.single
+                as Map<String, dynamic>;
+        expect(captured['tag_uuids'], ['tag-server-1', 'tag-server-2']);
+        final stored = await local.getByLocalUuid(note.localUuid);
+        expect(stored!.serverUuid, 'server-1');
+        expect(stored.syncStatus, SyncStatus.synced);
+      },
+    );
   });
 
   group('pull — last-write-wins reconciliation', () {
@@ -270,6 +343,40 @@ void main() {
         expect(stored.syncStatus, SyncStatus.pendingUpdate);
       },
     );
+
+    test('a pulled note resolves its tags and pin state', () async {
+      await insertLocalTag(
+        localUuid: 'tag-local-1',
+        serverUuid: 'tag-server-1',
+      );
+      when(() => remote.index(page: 1)).thenAnswer(
+        (_) async => NotePage(
+          items: [
+            {
+              'uuid': 'server-1',
+              'title': 'Idée',
+              'priority': 'normal',
+              'color_mode': 'automatic',
+              'is_archived': false,
+              'is_pinned': true,
+              'tags': [
+                {'uuid': 'tag-server-1', 'name': 'Une étiquette'},
+              ],
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+          ],
+          lastPage: 1,
+        ),
+      );
+
+      await repository.pull();
+
+      final stored = await local.getByLocalUuid(
+        (await local.localUuidForServerUuid('server-1'))!,
+      );
+      expect(stored!.isPinned, isTrue);
+      expect(stored.tagLocalUuids, ['tag-local-1']);
+    });
 
     test('a synced local row absent from the pull is pruned', () async {
       await local.upsert(

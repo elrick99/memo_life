@@ -75,6 +75,9 @@ class ReminderRepository implements Syncable {
   Future<void> toggleCompleted(ReminderModel reminder) =>
       updateReminder(reminder.copyWith(isCompleted: !reminder.isCompleted));
 
+  Future<void> togglePin(ReminderModel reminder) =>
+      updateReminder(reminder.copyWith(isPinned: !reminder.isPinned));
+
   Future<void> deleteReminder(ReminderModel reminder) async {
     if (reminder.serverUuid == null) {
       await _local.deleteHard(reminder.localUuid);

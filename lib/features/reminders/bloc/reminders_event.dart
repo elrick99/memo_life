@@ -88,3 +88,12 @@ class ReminderDeleted extends RemindersEvent {
   @override
   List<Object?> get props => [reminder];
 }
+
+class ReminderPinToggled extends RemindersEvent {
+  const ReminderPinToggled(this.reminder);
+
+  final ReminderModel reminder;
+
+  @override
+  List<Object?> get props => [reminder];
+}

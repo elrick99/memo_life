@@ -103,17 +103,32 @@ class AppDatabase {
     ''');
 
     batch.execute('''
+      CREATE TABLE tags (
+        local_uuid   TEXT PRIMARY KEY,
+        server_uuid  TEXT UNIQUE,
+        name         TEXT NOT NULL,
+        color        TEXT,
+        updated_at   TEXT NOT NULL,
+        sync_status  TEXT NOT NULL DEFAULT '${SyncStatus.pendingCreate}'
+      )
+    ''');
+
+    batch.execute('''
       CREATE TABLE notes (
         local_uuid           TEXT PRIMARY KEY,
         server_uuid          TEXT UNIQUE,
         category_local_uuid  TEXT REFERENCES categories (local_uuid) ON DELETE SET NULL,
+        tag_local_uuids       TEXT,
         title                TEXT NOT NULL,
         content              TEXT,
+        content_format       TEXT NOT NULL DEFAULT 'plain',
         checklist            TEXT,
         priority             TEXT NOT NULL DEFAULT 'normal',
         color                TEXT,
         color_mode           TEXT NOT NULL DEFAULT 'automatic',
         is_archived          INTEGER NOT NULL DEFAULT 0,
+        is_pinned            INTEGER NOT NULL DEFAULT 0,
+        is_locked            INTEGER NOT NULL DEFAULT 0,
         created_at           TEXT,
         updated_at           TEXT NOT NULL,
         sync_status          TEXT NOT NULL DEFAULT '${SyncStatus.pendingCreate}'
@@ -134,6 +149,7 @@ class AppDatabase {
         priority             TEXT NOT NULL,
         recurrence           TEXT NOT NULL DEFAULT 'none',
         is_completed         INTEGER NOT NULL DEFAULT 0,
+        is_pinned            INTEGER NOT NULL DEFAULT 0,
         updated_at           TEXT NOT NULL,
         sync_status          TEXT NOT NULL DEFAULT '${SyncStatus.pendingCreate}'
       )
@@ -211,6 +227,7 @@ class AppDatabase {
       'notes',
       'saving_goals',
       'categories',
+      'tags',
       'accounts',
       'app_meta',
     ]) {

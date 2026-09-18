@@ -35,9 +35,7 @@ class ReminderCollaboratorRemoteDataSource {
   Future<List<ReminderCollaboratorModel>> index(
     String reminderServerUuid,
   ) async {
-    final body = await _api.get(
-      '/reminders/$reminderServerUuid/collaborators',
-    );
+    final body = await _api.get('/reminders/$reminderServerUuid/collaborators');
 
     return (body['data'] as List<dynamic>)
         .cast<Map<String, dynamic>>()

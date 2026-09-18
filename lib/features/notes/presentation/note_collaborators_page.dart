@@ -69,9 +69,8 @@ class _NoteCollaboratorsPageState extends State<NoteCollaboratorsPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _invite() async {
@@ -102,7 +101,10 @@ class _NoteCollaboratorsPageState extends State<NoteCollaboratorsPage> {
     }
   }
 
-  Future<void> _changeRole(NoteCollaboratorModel collaborator, String role) async {
+  Future<void> _changeRole(
+    NoteCollaboratorModel collaborator,
+    String role,
+  ) async {
     try {
       await _remote.updateRole(
         noteServerUuid: widget.noteServerUuid,
